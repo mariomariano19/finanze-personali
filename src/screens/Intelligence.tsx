@@ -3,48 +3,23 @@ import { useNav } from '../ui/nav';
 import { Header, IconButton, Segmented, Empty, useToast } from '../ui/common';
 import { Icon } from '../ui/Icon';
 import { useIntel } from '../intel/useIntel';
-import { BASELINE_BRIER, WATCH_CATEGORIES, safeUrl, trackerMetrics, type Briefing, type InvestorProfile, type Opportunity, type WatchItem } from '../intel/model';
+import { BASELINE_BRIER, CLS_LABEL, NOT_COMPANY, WATCH_CATEGORIES, safeUrl, trackerMetrics, type Briefing, type InvestorProfile, type Opportunity, type Outcome, type Prediction, type WatchItem } from '../intel/model';
+import { Ext, Src, dayName, num, pct, ratio, romeDate, tone, when } from '../intel/ui';
 import { newId } from '../core/id';
 
 type Section = 'oggi' | 'previsioni' | 'watchlist' | 'profilo';
 
-const num = (n?: number, d = 2) => (typeof n === 'number' && isFinite(n) ? n.toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—');
-const pct = (n?: number) => (typeof n === 'number' && isFinite(n) ? `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : '—');
-const ratio = (n: number | null) => (n === null ? '—' : `${Math.round(n * 100)}%`);
-const tone = (n?: number) => (typeof n === 'number' ? (n > 0 ? 'good' : n < 0 ? 'danger' : '') : '');
-const when = (iso?: string) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-};
-const dayName = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
-
-function Ext({ href, children, className }: { href?: string; children: React.ReactNode; className?: string }) {
-  const u = safeUrl(href);
-  return u ? (
-    <a href={u} target="_blank" rel="noopener noreferrer" className={className} style={{ color: 'var(--income)' }}>
-      {children}
-    </a>
-  ) : (
-    <span className={className}>{children}</span>
-  );
-}
-
-function Src({ source, url, asOf, status }: { source?: string; url?: string; asOf?: string; status?: string }) {
-  if (!source && !asOf && !status) return null;
-  return (
-    <span className="tiny muted" style={{ display: 'block' }}>
-      {source && <Ext href={url}>{source}</Ext>}
-      {asOf && ` · ${when(asOf)}`}
-      {status && ` · ${status}`}
-    </span>
-  );
-}
+// la sezione scelta resta tale tornando indietro da una scheda azienda
+let lastSection: Section = 'oggi';
 
 export function Intelligence() {
   const nav = useNav();
   const intel = useIntel();
-  const [section, setSection] = useState<Section>('oggi');
+  const [section, setSectionState] = useState<Section>(lastSection);
+  const setSection = (s: Section) => {
+    lastSection = s;
+    setSectionState(s);
+  };
 
   if (!intel.configured) {
     return (
@@ -136,7 +111,7 @@ function Today({ intel }: { intel: IntelState }) {
       {!b ? (
         <div className="card"><Empty>Caricamento del briefing…</Empty></div>
       ) : (
-        <BriefingView b={b} />
+        <BriefingView b={b} preds={intel.cache.predictions} outcomes={intel.cache.outcomes} />
       )}
     </>
   );
@@ -160,8 +135,12 @@ function Scenarios({ s }: { s?: Opportunity['scenarios'] }) {
   );
 }
 
-function BriefingView({ b }: { b: Briefing }) {
+function BriefingView({ b, preds, outcomes }: { b: Briefing; preds: Prediction[]; outcomes: Outcome[] }) {
+  const nav = useNav();
   const d = b.day ?? {};
+  const predById = new Map(preds.map((p) => [p.id, p]));
+  const verified = outcomes.filter((o) => romeDate(o.checkedAt) === b.date && predById.has(o.predictionId));
+  const wl = b.watchlist;
   const list = (title: string, arr?: (string | { time?: string; event: string })[]) =>
     arr && arr.length ? (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -224,6 +203,35 @@ function BriefingView({ b }: { b: Briefing }) {
           ))}
         </>
       )}
+      {!!verified.length && (
+        <div className="card tight">
+          <div className="card-title" style={{ padding: '12px 0 4px' }}>Previsioni verificate oggi</div>
+          {verified.map((o) => (
+            <OutcomeRow key={o.predictionId} p={predById.get(o.predictionId)!} o={o} />
+          ))}
+        </div>
+      )}
+      {wl && (wl.highlights?.length || wl.quiet?.length || wl.note) && (
+        <div className="card" style={{ gap: 10 }}>
+          <span className="card-title">La tua watchlist</span>
+          {wl.note && <span className="tiny muted">{wl.note}</span>}
+          {wl.highlights?.map((h, i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: i ? 10 : 0, borderTop: i ? '1px solid var(--line-soft)' : 0 }}>
+              <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                {h.itemId ? (
+                  <button className="link" style={{ padding: 0, fontWeight: 700, textAlign: 'left' }} onClick={() => nav.push({ name: 'dossier', itemId: h.itemId! })}>{h.name} ›</button>
+                ) : (
+                  <b className="small">{h.name}</b>
+                )}
+                {typeof h.changePct === 'number' && <b className={`num small ${tone(h.changePct)}`}>{pct(h.changePct)}</b>}
+              </span>
+              <span className="small">{h.text}</span>
+              <Src source={h.source} url={h.url} asOf={h.asOf} />
+            </div>
+          ))}
+          {!!wl.quiet?.length && <span className="small muted"><b>Nessuna novità rilevante:</b> {wl.quiet.join(', ')}.</span>}
+        </div>
+      )}
       {!!b.news?.length && (
         <div className="card">
           <span className="card-title">Le notizie che contano</span>
@@ -269,10 +277,17 @@ function Tracker({ intel }: { intel: IntelState }) {
   const preds = intel.cache.predictions;
   const m = useMemo(() => trackerMetrics(preds, intel.cache.outcomes), [preds, intel.cache.outcomes]);
   const outcomeById = new Map(intel.cache.outcomes.map((o) => [o.predictionId, o]));
-  const integrity = intel.chain.ok ? (
-    <div className="notice info"><Icon name="shield" size={18} /><span>Registro integro: {intel.chain.checked} previsioni verificate. Nessuna è stata modificata o cancellata.</span></div>
+  const integrity = intel.chain.ok && intel.outChain.ok ? (
+    <div className="notice info"><Icon name="shield" size={18} /><span>Registro integro: {intel.chain.checked} previsioni e {intel.outChain.checked} esiti controllati. Nessuno è stato modificato o cancellato.</span></div>
   ) : (
-    <div className="notice err" role="alert"><Icon name="info" size={18} /><span>Registro alterato alla previsione n. {intel.chain.brokenAt}: una voce è stata modificata o cancellata dopo la pubblicazione.</span></div>
+    <div className="notice err" role="alert">
+      <Icon name="info" size={18} />
+      <span>
+        {!intel.chain.ok && <>Registro alterato alla previsione n. {intel.chain.brokenAt}. </>}
+        {!intel.outChain.ok && <>Esiti alterati alla voce n. {intel.outChain.brokenAt}. </>}
+        Una voce è stata modificata o cancellata dopo la pubblicazione.
+      </span>
+    </div>
   );
   if (!preds.length) return <>{integrity}<div className="card"><Empty>Nessuna previsione ancora. Ogni briefing ne aggiunge cinque, verificate alla scadenza.</Empty></div></>;
   const table = (title: string, g: Record<string, { n: number; hit: number; brier: number }>) =>
@@ -296,7 +311,12 @@ function Tracker({ intel }: { intel: IntelState }) {
         <div className="kpi"><span className="k">Brier medio</span><span className={`v num ${m.brier !== null ? (m.brier < BASELINE_BRIER ? 'good' : 'danger') : ''}`}>{m.brier === null ? '—' : num(m.brier, 3)}</span><span className="d">riferimento {num(BASELINE_BRIER, 3)} · più basso è meglio</span></div>
         <div className="kpi"><span className="k">Errore medio</span><span className="v num">{m.mae === null ? '—' : `${num(m.mae)} pt`}</span><span className="d">rendimento atteso vs effettivo</span></div>
       </div>
-      {m.brier !== null && (
+      {m.n < 30 && (
+        <span className="small muted">
+          {m.n === 0 ? 'Nessuna previsione ancora verificata: le prime scadono a metà novembre.' : `Campione ancora troppo piccolo (${m.n} verificate): servono almeno 30 previsioni chiuse prima di trarre conclusioni.`}
+        </span>
+      )}
+      {m.brier !== null && m.n >= 30 && (
         <span className="small">
           {m.brier < BASELINE_BRIER ? 'Finora le previsioni fanno meglio del riferimento ingenuo (un terzo per scenario).' : 'Finora le previsioni non fanno meglio del riferimento ingenuo (un terzo per scenario).'} Servono decine di previsioni verificate perché il confronto sia significativo.
         </span>
@@ -317,27 +337,63 @@ function Tracker({ intel }: { intel: IntelState }) {
       )}
       <div className="section-title"><h2>Storico</h2></div>
       <div className="card tight">
-        {[...preds].sort((a, b) => b.seq - a.seq).slice(0, 100).map((p) => {
-          const o = outcomeById.get(p.id);
-          const st = !o ? 'aperta' : o.result === 'correct' ? 'corretta' : o.result === 'wrong' ? 'errata' : 'non conclusiva';
-          return (
-            <div key={p.id} className="row" style={{ cursor: 'default' }}>
-              <span className="main">
-                <span className="title">n. {p.seq} · {p.instrument}</span>
-                <span className="sub">
-                  {when(p.createdAt)} · {p.horizonLabel} · rif. {num(p.refPrice)} {p.currency}
-                  <span className={`tag ${o?.result === 'correct' ? '' : ''}`} style={o?.result === 'correct' ? { color: 'var(--good)' } : o?.result === 'wrong' ? { color: 'var(--danger)' } : undefined}>{st}</span>
-                </span>
-              </span>
-              <span className="amt num small" style={{ fontWeight: 600 }}>
-                <span className="good">{Math.round(p.probs.up * 100)}</span> / {Math.round(p.probs.neutral * 100)} / <span className="danger">{Math.round(p.probs.down * 100)}</span>
-              </span>
-            </div>
-          );
-        })}
+        {[...preds].sort((a, b) => b.seq - a.seq).slice(0, 100).map((p) => (
+          <OutcomeRow key={p.id} p={p} o={outcomeById.get(p.id)} />
+        ))}
       </div>
-      <span className="tiny muted">Probabilità rialzo / neutrale / ribasso, in %. Le regole di verifica sono nel documento di progetto e nel Metodo.</span>
+      <div className="card small" style={{ gap: 6 }}>
+        <span className="card-title">Come vengono verificate</span>
+        <span>Alla scadenza (data del prezzo di partenza + giorni dell’orizzonte) si prende l’ultima chiusura disponibile, con fonte e link.</span>
+        <span>L’esito si calcola sul <b>rendimento totale</b>: prezzo più dividendi staccati nel periodo. Rialzo o ribasso se supera la fascia neutrale (±1,5% a 1 settimana, ±3% a 1 mese, ±6% a 3-6 mesi, ±10% a 12 mesi), altrimenti neutrale.</span>
+        <span>“Corretta” significa che lo scenario con la probabilità più alta si è avverato. Il calcolo è fatto da un programma, non dall’IA. Se in una settimana non si trova un prezzo affidabile, l’esito è “non verificabile” e non entra nelle statistiche.</span>
+      </div>
+      <span className="tiny muted">Probabilità rialzo / neutrale / ribasso, in %.</span>
     </>
+  );
+}
+
+function OutcomeRow({ p, o }: { p: Prediction; o?: Outcome }) {
+  const [open, setOpen] = useState(false);
+  const st = !o ? 'aperta' : o.result === 'correct' ? 'corretta' : o.result === 'wrong' ? 'errata' : 'non verificabile';
+  const color = o?.result === 'correct' ? 'var(--good)' : o?.result === 'wrong' ? 'var(--danger)' : undefined;
+  const expiry = o?.expiryDate;
+  return (
+    <div style={{ borderBottom: '1px solid var(--line-soft)' }}>
+      <button className="row" style={{ width: '100%', textAlign: 'left', borderBottom: 0 }} aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="main">
+          <span className="title">n. {p.seq} · {p.instrument}</span>
+          <span className="sub">
+            {when(p.createdAt)} · {p.horizonLabel} · rif. {num(p.refPrice)} {p.currency}
+            <span className="tag" style={color ? { color } : undefined}>{st}</span>
+          </span>
+        </span>
+        <span className="amt num small" style={{ fontWeight: 600 }}>
+          <span className="good">{Math.round(p.probs.up * 100)}</span> / {Math.round(p.probs.neutral * 100)} / <span className="danger">{Math.round(p.probs.down * 100)}</span>
+          {o && typeof o.totalReturnPct === 'number' && <small className={tone(o.totalReturnPct)}>{pct(o.totalReturnPct)}</small>}
+        </span>
+      </button>
+      {open && (
+        <div className="small" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 4px 12px' }}>
+          {p.rationale && <span><b>Motivo:</b> {p.rationale}</span>}
+          <span className="muted">Prezzo di partenza: {num(p.refPrice)} {p.currency} · <Ext href={p.refPriceUrl}>{p.refPriceSource ?? 'fonte'}</Ext> · {when(p.refPriceAsOf)}</span>
+          {!o && <span className="muted">In attesa della scadenza.</span>}
+          {o && o.result !== 'inconclusive' && (
+            <>
+              <span>
+                Chiusura finale {num(o.finalPrice)} {p.currency} del {when(o.finalPriceAsOf)} · <Ext href={o.finalPriceUrl}>{o.finalPriceSource ?? 'fonte'}</Ext>
+                {expiry && <> · scadenza {new Date(`${expiry}T12:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}</>}
+              </span>
+              <span>
+                Prezzo <b className={tone(o.priceReturnPct)}>{pct(o.priceReturnPct)}</b>
+                {!!o.dividends?.length && <> · con dividendi <b className={tone(o.totalReturnPct)}>{pct(o.totalReturnPct)}</b> ({o.dividends.map((d, i) => <Ext key={i} href={d.url}>{num(d.amount, 3)} {p.currency} il {new Date(`${d.exDate}T12:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}</Ext>)})</>}
+              </span>
+              <span>Esito: <b>{o.realized ? CLS_LABEL[o.realized] : '—'}</b> (fascia ±{num(p.neutralBandPct, 1)}%) · Brier {num(o.brier, 3)}</span>
+            </>
+          )}
+          {o?.note && <span className="muted">{o.note}</span>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -349,6 +405,8 @@ function Watchlist({ intel }: { intel: IntelState }) {
   const [category, setCategory] = useState(WATCH_CATEGORIES[1]);
   const [region, setRegion] = useState('Europa');
   const [busy, setBusy] = useState(false);
+  const nav = useNav();
+  const dIdx = intel.cache.dossierIndex?.items ?? {};
   const items = intel.cache.watchlist;
   const groups = WATCH_CATEGORIES.map((c) => ({ c, items: items.filter((w) => w.category === c).sort((a, b) => a.name.localeCompare(b.name)) })).filter((g) => g.items.length);
 
@@ -375,17 +433,27 @@ function Watchlist({ intel }: { intel: IntelState }) {
   }
   return (
     <>
-      <span className="small muted">Gli strumenti che l’IA segue ogni giorno. Stare in watchlist non è un giudizio d’acquisto.</span>
+      <span className="small muted">Gli strumenti che l’IA segue ogni giorno. Tocca un’azienda per la sua scheda. Stare in watchlist non è un giudizio d’acquisto.</span>
       {!groups.length && <div className="card"><Empty>Watchlist vuota.</Empty></div>}
       {groups.map((g) => (
         <div key={g.c} className="card tight">
           <div className="card-title" style={{ padding: '12px 0 4px' }}>{g.c} <span className="aside">{g.items.length}</span></div>
           {g.items.map((w) => (
             <div key={w.id} className="row" style={{ minHeight: 48, cursor: 'default' }}>
-              <span className="main">
-                <span className="title" style={{ fontWeight: 500 }}>{w.name}</span>
-                <span className="sub">{w.region}{w.ticker && <span className="tag">{w.ticker}</span>}</span>
-              </span>
+              {NOT_COMPANY.includes(w.category) ? (
+                <span className="main">
+                  <span className="title" style={{ fontWeight: 500 }}>{w.name}</span>
+                  <span className="sub">{w.region}{w.ticker && <span className="tag">{w.ticker}</span>}</span>
+                </span>
+              ) : (
+                <button className="main" style={{ textAlign: 'left', background: 'none', border: 0, padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer' }} onClick={() => nav.push({ name: 'dossier', itemId: w.id })}>
+                  <span className="title" style={{ fontWeight: 500 }}>{w.name} <span className="muted">›</span></span>
+                  <span className="sub">
+                    {w.region}{w.ticker && <span className="tag">{w.ticker}</span>}
+                    <span className="tiny muted">{dIdx[w.id]?.updatedAt ? `scheda del ${when(dIdx[w.id].updatedAt)}` : 'scheda in preparazione'}</span>
+                  </span>
+                </button>
+              )}
               {intel.canWrite && (
                 <button className="link" disabled={busy} aria-label={`Togli ${w.name}`} onClick={() => save(items.filter((x) => x.id !== w.id), `Watchlist: tolto ${w.name}`, 'Tolto dalla watchlist')}>
                   Togli

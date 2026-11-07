@@ -17,6 +17,13 @@ Web app (PWA) per iPhone per gestire ricavi, costi e investimenti. I dati restan
 - Filtri temporali per settimana, mese, trimestre, anno o periodo personalizzato.
 - Backup cifrato (file JSON) da salvare in iCloud Drive, ripristino ed export dei movimenti in CSV.
 
+## Novità della versione 0.6 (Intelligence: verifica delle previsioni e schede aziende)
+
+- **Verifica alla scadenza (X3).** Ogni mattina il motore cerca le previsioni scadute (`tools/intel.mjs due`) e ne registra l'esito (`add-outcomes`). Regole: ultima chiusura disponibile alla scadenza (data del prezzo di partenza + giorni dell'orizzonte), rendimento totale con i dividendi staccati nel periodo, classe rialzo/neutrale/ribasso secondo la fascia dell'orizzonte. Il calcolo lo fa lo strumento, non l'IA. Senza un prezzo affidabile entro 7 giorni l'esito è "non verificabile".
+- **Esiti a prova di modifica.** Anche gli esiti sono legati da una catena di impronte; l'app li controlla insieme alle previsioni.
+- **Schede aziende (X4).** Toccando un'azienda nella watchlist si apre la sua scheda (profilo, conti, solidità, valutazione, dividendo, eventi, punti di forza e rischi, notizie, nostre previsioni). Le scrive un secondo motore alle 23:00 dei giorni feriali (`dossier-plan`, `dossier-get`, `dossier-put`), circa sette revisioni complete a sera più gli aggiornamenti dovuti a notizie e trimestrali. File cifrati in `docs/intel/dossiers/`.
+- **Report watchlist nel briefing.** Sezione "La tua watchlist": aziende con novità in evidenza, le altre in una riga.
+
 ## Novità della versione 0.4 (investimenti, tappa I1 – prima parte)
 
 - Intermediari (broker, banche, fondi pensione) con il regime fiscale: amministrato o dichiarativo.

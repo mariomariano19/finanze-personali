@@ -3,7 +3,7 @@ import { vault } from '../persistence/vault';
 import { useData } from '../state/store';
 import { IntelClient } from './client';
 import { verifyChain, type ChainResult } from './crypto';
-import type { Briefing, IntelIndex, InvestorProfile, Outcome, Prediction, WatchItem } from './model';
+import type { Briefing, Dossier, DossierIndex, IntelIndex, InvestorProfile, Outcome, Prediction, WatchItem } from './model';
 import type { IntelCache } from '../core/types';
 import { nowISO } from '../core/id';
 
@@ -15,9 +15,11 @@ interface Cache {
   outcomes: Outcome[];
   watchlist: WatchItem[];
   profile: InvestorProfile | null;
+  dossierIndex?: DossierIndex | null;
+  dossiers?: Record<string, Dossier>;
 }
 
-const EMPTY: Cache = { fetchedAt: '', index: null, briefings: {}, predictions: [], outcomes: [], watchlist: [], profile: null };
+const EMPTY: Cache = { fetchedAt: '', index: null, briefings: {}, predictions: [], outcomes: [], watchlist: [], profile: null, dossierIndex: null, dossiers: {} };
 
 function saveCache(c: Cache) {
   vault.put('intel', { id: 'cache', ...c } as unknown as IntelCache);
@@ -33,6 +35,7 @@ export function useIntel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chain, setChain] = useState<ChainResult>({ ok: true, checked: 0, brokenAt: null });
+  const [outChain, setOutChain] = useState<ChainResult>({ ok: true, checked: 0, brokenAt: null });
   const busy = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -41,12 +44,13 @@ export function useIntel() {
     setLoading(true);
     setError(null);
     try {
-      const [index, reg, out, wl, profile] = await Promise.all([
+      const [index, reg, out, wl, profile, dossierIndex] = await Promise.all([
         client.read<IntelIndex>('index'),
         client.read<{ predictions: Prediction[] }>('predictions'),
         client.read<{ outcomes: Outcome[] }>('outcomes'),
         client.read<{ items: WatchItem[] }>('watchlist'),
-        client.read<InvestorProfile>('profile')
+        client.read<InvestorProfile>('profile'),
+        client.read<DossierIndex>('dossiers')
       ]);
       const cur = ((vault.get('intel', 'cache') as unknown as Cache | undefined) ?? EMPTY);
       const briefings = { ...cur.briefings };
@@ -54,7 +58,10 @@ export function useIntel() {
         const b = await client.read<Briefing>(`briefings/${index.latest}`);
         if (b) briefings[index.latest] = b;
       }
-      saveCache({ fetchedAt: nowISO(), index, briefings, predictions: reg?.predictions ?? [], outcomes: out?.outcomes ?? [], watchlist: wl?.items ?? [], profile });
+      // le schede già in copia locale restano valide finché l'indice non dice che sono cambiate
+      const dossiers: Record<string, Dossier> = {};
+      for (const [id, d] of Object.entries(cur.dossiers ?? {})) if (dossierIndex?.items[id]?.updatedAt === d.updatedAt) dossiers[id] = d;
+      saveCache({ fetchedAt: nowISO(), index, briefings, predictions: reg?.predictions ?? [], outcomes: out?.outcomes ?? [], watchlist: wl?.items ?? [], profile, dossierIndex, dossiers });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -70,6 +77,20 @@ export function useIntel() {
       try {
         const b = await client.read<Briefing>(`briefings/${date}`);
         if (b) saveCache({ ...cur, briefings: { ...cur.briefings, [date]: b } });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [client]
+  );
+
+  const loadDossier = useCallback(
+    async (id: string) => {
+      const cur = ((vault.get('intel', 'cache') as unknown as Cache | undefined) ?? EMPTY);
+      if (cur.dossiers?.[id] || !client || !cur.dossierIndex?.items[id]) return;
+      try {
+        const d = await client.read<Dossier>(`dossiers/${id}`);
+        if (d) saveCache({ ...cur, dossiers: { ...(cur.dossiers ?? {}), [id]: d } });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -108,10 +129,11 @@ export function useIntel() {
   useEffect(() => {
     let alive = true;
     verifyChain(cache.predictions).then((r) => alive && setChain(r));
+    verifyChain(cache.outcomes as { seq: number; prevHash: string; hash: string }[]).then((r) => alive && setOutChain(r));
     return () => {
       alive = false;
     };
-  }, [cache.predictions]);
+  }, [cache.predictions, cache.outcomes]);
 
-  return { configured, canWrite: Boolean(client?.canWrite), client, cache, loading, error, chain, refresh, loadBriefing, saveWatchlist, saveProfile };
+  return { configured, canWrite: Boolean(client?.canWrite), client, cache, loading, error, chain, outChain, refresh, loadBriefing, loadDossier, saveWatchlist, saveProfile };
 }

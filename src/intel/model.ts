@@ -63,6 +63,11 @@ export interface Briefing {
   news?: NewsItem[];
   day?: { favored?: string[]; penalized?: string[]; watch?: string[]; calendar?: ({ time?: string; event: string } | string)[]; volatility?: string[] };
   alerts?: { title: string; text?: string; url?: string }[];
+  watchlist?: {
+    highlights?: { name: string; ticker?: string; itemId?: string; text: string; changePct?: number; source?: string; url?: string; asOf?: string }[];
+    quiet?: string[];
+    note?: string;
+  };
 }
 
 export interface IntelIndex {
@@ -101,14 +106,67 @@ export interface Prediction {
 export interface Outcome {
   predictionId: string;
   checkedAt: string;
+  expiryDate?: string;
   finalPrice?: number;
+  finalPriceAsOf?: string;
   finalPriceSource?: string;
   finalPriceUrl?: string;
+  dividends?: { exDate: string; amount: number; source?: string; url?: string }[];
+  dividendsChecked?: boolean;
+  priceReturnPct?: number;
+  totalReturnPct?: number;
+  /** rendimento usato per l'esito (totale, dividendi inclusi) */
   actualReturnPct?: number;
   realized?: Cls;
   result: 'correct' | 'wrong' | 'inconclusive';
+  brier?: number;
+  rule?: string;
   note?: string;
+  seq?: number;
+  prevHash?: string;
+  hash?: string;
 }
+
+export const CLS_LABEL: Record<Cls, string> = { up: 'rialzo', neutral: 'neutrale', down: 'ribasso' };
+
+// ---------- schede aziendali ----------
+export interface DossierSource {
+  name: string;
+  url?: string;
+}
+
+export interface DossierSection {
+  key: string;
+  title: string;
+  asOf?: string;
+  text?: string;
+  facts?: { label: string; value: string; note?: string }[];
+  table?: { unit?: string; columns: string[]; rows: { label: string; values: string[] }[] };
+  bullets?: string[];
+  sources?: DossierSource[];
+  missing?: string;
+}
+
+export interface Dossier {
+  itemId: string;
+  name: string;
+  ticker?: string;
+  updatedAt?: string;
+  fullReviewAt?: string | null;
+  summary?: string;
+  price?: { value?: number; currency?: string; changePct?: number; asOf?: string; source?: string; url?: string; status?: string };
+  sections?: DossierSection[];
+  news?: { title: string; url?: string; source?: string; date?: string; summary?: string }[];
+  missing?: string[];
+}
+
+export interface DossierIndex {
+  items: Record<string, { name: string; updatedAt?: string; fullReviewAt?: string | null; summary?: string }>;
+  updatedAt?: string;
+}
+
+/** Categorie della watchlist che non sono aziende (niente scheda) */
+export const NOT_COMPANY = ['Indici', 'Titoli di Stato', 'ETF', 'Materie prime'];
 
 export interface WatchItem {
   id: string;

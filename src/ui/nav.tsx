@@ -26,7 +26,8 @@ export type Route =
   | { name: 'security' }
   | { name: 'holding'; id: string }
   | { name: 'brokers' }
-  | { name: 'intelSetup' };
+  | { name: 'intelSetup' }
+  | { name: 'dossier'; itemId: string };
 
 export type SheetState =
   | { name: 'tx'; id?: string; type?: TxType | 'investment'; categoryId?: string }

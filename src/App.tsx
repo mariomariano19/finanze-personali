@@ -10,6 +10,7 @@ import { Home } from './screens/Home';
 import { Income } from './screens/Income';
 import { Costs } from './screens/Costs';
 import { Investments, HoldingDetail, Brokers } from './screens/Investments';
+import { Dossier } from './screens/Dossier';
 import { Reports } from './screens/Reports';
 import { Intelligence } from './screens/Intelligence';
 import { IntelSetup } from './screens/IntelSetup';
@@ -122,6 +123,7 @@ function Shell({ onLock }: { onLock: () => void }) {
       case 'holding': content = <HoldingDetail id={route.id} />; break;
       case 'brokers': content = <Brokers />; break;
       case 'intelSetup': content = <IntelSetup />; break;
+      case 'dossier': content = <Dossier itemId={route.itemId} />; break;
     }
   } else {
     content = tab === 'home' ? <Home /> : tab === 'income' ? <Income /> : tab === 'costs' ? <Costs /> : tab === 'invest' ? <Investments /> : tab === 'intel' ? <Intelligence /> : <Reports />;

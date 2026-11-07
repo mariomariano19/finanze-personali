@@ -13,7 +13,7 @@ export interface IntelConfig {
 
 export const INTEL_DIR = 'docs/intel';
 
-export type IntelFile = 'index' | 'predictions' | 'outcomes' | 'watchlist' | 'profile' | `briefings/${string}`;
+export type IntelFile = 'index' | 'predictions' | 'outcomes' | 'watchlist' | 'profile' | 'dossiers' | `briefings/${string}` | `dossiers/${string}`;
 
 /** Deduce "proprietario/deposito" dall'indirizzo di GitHub Pages (proprietario.github.io/deposito/) */
 export function repoFromLocation(loc: Location = window.location): string | null {

@@ -1,4 +1,5 @@
-node_modules/
-dist/
-dist-anteprima/
 *.local
+dist-anteprima/
+dist/
+node_modules
+node_modules/
