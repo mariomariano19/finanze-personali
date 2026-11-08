@@ -51,7 +51,7 @@ export function HoldingSheet({ id }: { id?: string }) {
     };
     const isNewNonListed = !h && nonListed && (parseEUR(value) ?? 0) > 0;
     vault.put('hold', {
-      ...(h ?? { price: 0, priceDate: today() }),
+      ...(h ?? { price: 0, priceDate: '1970-01-01' }), // nessun prezzo ancora: la prima operazione o il primo prezzo lo sostituiscono
       ...(isNewNonListed ? { price: parseEUR(value)!, priceDate: date, priceSource: 'manual' as const } : {}),
       id: nid,
       name: name.trim(),
@@ -194,7 +194,7 @@ export function OpSheet({ holdingId, id }: { holdingId?: string; id?: string }) 
       source: op?.source ?? 'manual', externalId: op?.externalId, note: note.trim() || undefined
     });
     const h = vault.get('hold', hid);
-    if (h && !nonListed && (kind === 'buy' || kind === 'sell') && q > 0 && date >= h.priceDate) vault.put('hold', { ...h, price: cents / q, priceDate: date, priceSource: 'operation' });
+    if (h && !nonListed && (kind === 'buy' || kind === 'sell') && q > 0 && (date >= h.priceDate || h.price <= 0)) vault.put('hold', { ...h, price: cents / q, priceDate: date, priceSource: 'operation' });
     toast(op ? 'Operazione aggiornata' : 'Operazione registrata');
     nav.closeSheet();
   }

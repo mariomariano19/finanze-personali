@@ -148,7 +148,7 @@ export interface Settings {
   backupReminderDays: number;
   createdAt: string;
   /** Collegamento all'Intelligence: chiave di cifratura, token GitHub e deposito (salvati cifrati con il PIN) */
-  intel?: { key?: string; token?: string; repo?: string; branch?: string };
+  intel?: { key?: string; token?: string; repo?: string; branch?: string; trackedHash?: string };
 }
 
 /** Copia locale dei dati Intelligence, per consultarli anche senza rete */

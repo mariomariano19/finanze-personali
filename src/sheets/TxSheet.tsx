@@ -183,7 +183,7 @@ export function TxSheet({ id, initialType, initialCategory }: { id?: string; ini
       vault.put('hold', { id: hid, name: newName.trim(), assetClass: newClass, taxClass: defaultTaxClass(newClass), price: unit, priceDate: date, priceSource: 'operation' });
     } else {
       const h = vault.get('hold', hid);
-      if (h && date >= h.priceDate) vault.put('hold', { ...h, price: unit, priceDate: date, priceSource: 'operation' });
+      if (h && (date >= h.priceDate || h.price <= 0)) vault.put('hold', { ...h, price: unit, priceDate: date, priceSource: 'operation' });
     }
     vault.put('op', { id: newId(), holdingId: hid, brokerId: invBroker || null, kind: opKind, date, quantity: qty, amount: cents, fees: toCents(fees.replace('.', ',')), taxes: 0, source: 'manual' });
     toast(opKind === 'buy' ? 'Acquisto registrato' : 'Vendita registrata');

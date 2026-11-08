@@ -13,7 +13,7 @@ export interface IntelConfig {
 
 export const INTEL_DIR = 'docs/intel';
 
-export type IntelFile = 'index' | 'predictions' | 'outcomes' | 'watchlist' | 'profile' | 'dossiers' | `briefings/${string}` | `dossiers/${string}`;
+export type IntelFile = 'index' | 'predictions' | 'outcomes' | 'watchlist' | 'profile' | 'dossiers' | 'tracked' | 'prices' | `briefings/${string}` | `dossiers/${string}`;
 
 /** Deduce "proprietario/deposito" dall'indirizzo di GitHub Pages (proprietario.github.io/deposito/) */
 export function repoFromLocation(loc: Location = window.location): string | null {
@@ -75,7 +75,7 @@ export class IntelClient {
   }
 
   /** Cifra e salva watchlist o profilo nel deposito (un commit) */
-  async write(file: 'watchlist' | 'profile', value: unknown, message: string): Promise<void> {
+  async write(file: 'watchlist' | 'profile' | 'tracked', value: unknown, message: string): Promise<void> {
     if (!this.canWrite) throw new Error('Per modificare serve il token GitHub (Impostazioni › Intelligence).');
     const url = `${GH}/repos/${this.repo}/contents/${INTEL_DIR}/${file}.enc.json`;
     const cur = await fetch(`${url}?ref=${this.branch}`, { headers: this.ghHeaders({ Accept: 'application/vnd.github+json' }), cache: 'no-store' });

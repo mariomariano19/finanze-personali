@@ -9,10 +9,13 @@ import { netInvested } from '../analytics/investments';
 import { formatEUR, formatPct, change } from '../core/money';
 import { daysBetween, lastMonths, monthShort, periodLabel, shiftPeriod, today } from '../core/dates';
 import { TxGroupedList } from '../ui/TxRow';
+import { useReturns } from './InvestReturns';
 
 export function Home() {
   const data = useData();
   const nav = useNav();
+  const ret = useReturns(data.holdings, data.ops, data.prices, '1G');
+  const hasPortfolio = ret.r.endValue > 0;
   const p = nav.period;
   const prevP = shiftPeriod(p, -1);
   const cur = totals(data.txs, p);
@@ -105,6 +108,22 @@ export function Home() {
           <span className="d">nel periodo</span>
         </button>
       </div>
+
+      {hasPortfolio && (
+        <button className="review" onClick={() => nav.setTab('invest')} style={{ alignItems: 'center' }}>
+          <span className="badge" style={{ background: 'var(--good)' }}>
+            <Icon name="trend" size={16} color="#fff" />
+          </span>
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span>Portafoglio {formatEUR(ret.r.endValue, { short: true })}</span>
+            <span className="tiny muted">
+              {ret.r.twr === null || ret.r.start === ret.asOf ? 'Variazione del giorno non ancora disponibile' : `${ret.r.twr >= 0 ? '+' : '−'}${Math.abs(ret.r.twr * 100).toLocaleString('it-IT', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}% · ${formatEUR(ret.r.gain, { sign: true, short: true })} dall’ultima chiusura`}
+              {ret.mv[0] && ret.mv[0].changePct > 0 ? ` · meglio: ${ret.mv[0].holding.name}` : ''}
+            </span>
+          </span>
+          <Icon name="chevron" size={16} color="var(--muted)" />
+        </button>
+      )}
 
       {toReview > 0 && (
         <button className="review" onClick={() => nav.push({ name: 'txList', filter: { review: true, title: 'Da confermare' } })}>

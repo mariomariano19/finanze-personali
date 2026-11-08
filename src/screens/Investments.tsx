@@ -7,6 +7,8 @@ import { Chart, AXIS, TOOLTIP, INVEST_SCALE } from '../ui/Chart';
 import { allocation, portfolioHistory, portfolioTotals, positions, positionAt, type Position } from '../analytics/investments';
 import { formatEUR, formatPct } from '../core/money';
 import { dayLabel, lastMonths, monthShort, today } from '../core/dates';
+import { ReturnsCard, ChangesCard } from './InvestReturns';
+import type { PeriodKey } from '../analytics/returns';
 import { ASSET_CLASS_LABEL, NON_LISTED, OP_KIND_LABEL, TAX_CLASS_LABEL, defaultTaxClass, type AssetClass } from '../core/types';
 
 const ABBR: Record<AssetClass, string> = { etf: 'ETF', stock: 'AZ', bond: 'OB', fund: 'FC', crypto: 'CR', cash: 'CD', real_estate: 'IM', pension: 'FP', other: '…' };
@@ -21,8 +23,7 @@ function PositionRow({ p, onClick }: { p: Position; onClick: () => void }) {
         <span className="title">{p.holding.name}</span>
         <span className="sub">
           {nonListed ? ASSET_CLASS_LABEL[p.holding.assetClass] : p.quantity > 0 ? `${qtyFmt(p.quantity)} quote` : 'Nessuna quota'}
-          {' · aggiornato '}
-          {dayLabel(p.holding.priceDate).toLowerCase()}
+          {p.holding.price > 0 ? <>{' · aggiornato '}{dayLabel(p.holding.priceDate).toLowerCase()}</> : ' · senza prezzo'}
         </span>
       </span>
       <span className="amt num">
@@ -38,6 +39,7 @@ export function Investments() {
   const nav = useNav();
   const brokers = data.brokers.filter((b) => !b.hidden);
   const [brokerId, setBrokerId] = useState<string | null>(null);
+  const [period, setPeriod] = useState<PeriodKey>('1M');
   const ops = useMemo(() => (brokerId ? data.ops.filter((o) => o.brokerId === brokerId) : data.ops), [data.ops, brokerId]);
   const ps = useMemo(() => positions(data.holdings, data.ops, brokerId), [data.holdings, data.ops, brokerId]);
   const tot = portfolioTotals(ps);
@@ -134,6 +136,9 @@ export function Investments() {
             </div>
           </div>
 
+          <ReturnsCard ops={ops} period={period} setPeriod={setPeriod} />
+          <ChangesCard ops={ops} period={period} />
+
           <div className="card" style={{ gap: 12 }}>
             <span className="card-title">Distribuzione</span>
             <div className="split-bar" style={{ height: 12, borderRadius: 6 }} aria-hidden="true">
@@ -152,7 +157,7 @@ export function Investments() {
 
           {listed.length > 0 && (
             <>
-              <div className="section-title"><h2>Titoli quotati</h2><span className="tiny muted">Prezzi automatici in arrivo</span></div>
+              <div className="section-title"><h2>Titoli quotati</h2><span className="tiny muted">Prezzi dal Morning Briefing</span></div>
               <div className="card tight">{listed.map((p) => <PositionRow key={p.holding.id} p={p} onClick={() => nav.push({ name: 'holding', id: p.holding.id })} />)}</div>
             </>
           )}

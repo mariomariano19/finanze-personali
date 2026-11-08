@@ -139,4 +139,48 @@ describe('formato condiviso app ↔ motore', () => {
     expect(d).toMatchObject({ name: 'Eni', ticker: 'ENI.MI', summary: 'Energia integrata' });
     expect(d.fullReview).toBeUndefined();
   });
+
+  it('prezzi: solo strumenti della lista, conversione in euro con cambio BCE, pence, validazioni', async () => {
+    const eng = await engine();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'intel-'));
+    const tool = path.resolve('tools/intel.mjs');
+    const { execFileSync } = await import('node:child_process');
+    const run = (args: string[]) => execFileSync('node', [tool, ...args, dir], { env: { ...process.env, INTEL_KEY: KEY, INTEL_TODAY: '2026-11-09' }, stdio: 'pipe' }).toString();
+    fs.writeFileSync(path.join(dir, 'tracked.enc.json'), JSON.stringify(eng.encrypt({ items: [{ id: 'h1', name: 'Nvidia', symbol: 'NVDA', assetClass: 'stock' }, { id: 'h2', name: 'BAE', symbol: 'BA.L', assetClass: 'stock' }, { id: 'h3', name: 'VWCE', assetClass: 'etf' }] })));
+    const plan = JSON.parse(run(['prices-plan']));
+    expect(plan.items.map((i: { id: string }) => i.id)).toEqual(['h1', 'h2', 'h3', 'benchmark']);
+    const f = path.join(dir, 'p.json');
+    const ok = { source: 'Fonte', url: 'https://x.org' };
+    const fx = { rate: 1.16, source: 'BCE', url: 'https://www.ecb.europa.eu/x' };
+    // in dollari senza cambio: rifiutato
+    fs.writeFileSync(f, JSON.stringify([{ id: 'h1', date: '2026-11-06', price: 186.64, currency: 'USD', ...ok }]));
+    expect(() => run(['add-prices', f])).toThrow();
+    // strumento non in lista, data troppo vecchia: rifiutati
+    fs.writeFileSync(f, JSON.stringify([{ id: 'xx', date: '2026-11-06', price: 1, currency: 'EUR', ...ok }]));
+    expect(() => run(['add-prices', f])).toThrow();
+    fs.writeFileSync(f, JSON.stringify([{ id: 'h3', date: '2026-10-01', price: 1, currency: 'EUR', ...ok }]));
+    expect(() => run(['add-prices', f])).toThrow();
+    fs.writeFileSync(f, JSON.stringify([
+      { id: 'h1', date: '2026-11-06', price: 186.64, currency: 'USD', fx: { ...fx, rate: 1.16 }, ...ok },
+      { id: 'h2', date: '2026-11-06', price: 2000, currency: 'GBX', fx: { ...fx, rate: 0.88 }, ...ok },
+      { id: 'h3', date: '2026-11-06', price: 140.1, currency: 'EUR', ...ok },
+      { id: 'benchmark', date: '2026-11-06', price: 600, currency: 'EUR', ...ok }
+    ]));
+    run(['add-prices', f]);
+    const book = eng.decrypt(JSON.parse(fs.readFileSync(path.join(dir, 'prices.enc.json'), 'utf8')));
+    expect(book.items.h1[0].price).toBeCloseTo(186.64 / 1.16, 5);
+    expect(book.items.h2[0].price).toBeCloseTo(20 / 0.88, 5);
+    expect(book.items.h3[0].price).toBe(140.1);
+    expect(book.benchmark.points[0].price).toBe(600);
+    expect(book.benchmark.symbol).toBe('SXR8.DE');
+  });
+
+  it('app: obbligazioni quotate per 100 di nominale riportate alla scala dello strumento', async () => {
+    const { toCents } = await import('../intel/prices');
+    const bond = { id: 'b', name: 'BTP', assetClass: 'bond', price: 101, priceDate: '2026-11-01' } as const;
+    // quota da 1 € di nominale (1,01 € = 101 centesimi): 101,5 per 100 → 101,5 centesimi
+    expect(toCents(bond as never, { date: '2026-11-06', price: 101.5, source: 's', url: 'https://x', unit: 'pct' }, 101)).toBeCloseTo(101.5);
+    // quota da 100 €: resta 10.150 centesimi
+    expect(toCents(bond as never, { date: '2026-11-06', price: 101.5, source: 's', url: 'https://x', unit: 'pct' }, 10100)).toBeCloseTo(10150);
+  });
 });

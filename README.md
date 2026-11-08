@@ -17,6 +17,13 @@ Web app (PWA) per iPhone per gestire ricavi, costi e investimenti. I dati restan
 - Filtri temporali per settimana, mese, trimestre, anno o periodo personalizzato.
 - Backup cifrato (file JSON) da salvare in iCloud Drive, ripristino ed export dei movimenti in CSV.
 
+## Novità della versione 0.7 (rendimenti del portafoglio)
+
+- **Rendimento** per periodo (1 giorno, 1 settimana, 1 mese, da inizio anno, 1 anno, dall'inizio): guadagno in euro al netto di versamenti e prelievi, TWR (rendimento della gestione), XIRR (rendimento dei tuoi soldi; non annualizzato sotto l'anno), confronto con l'S&P 500 (ETF SXR8 in euro), valore al netto delle tasse stimate (26%, 12,5% titoli di Stato; minusvalenze non compensate).
+- **Cosa è cambiato**: strumenti in salita e in discesa con l'effetto in euro, proventi incassati, prezzi vecchi, prezzi automatici sospetti da confermare (variazione oltre il 40%). Riepilogo del giorno anche in Home.
+- **Prezzi automatici dal Morning Briefing**: l'app pubblica, cifrata, solo la lista degli strumenti (nome, ticker, ISIN, tipo: nessuna quantità né importo) in `docs/intel/tracked.enc.json`; il motore scrive le chiusure in euro con fonte (cambio BCE per le altre valute) in `prices.enc.json` (`prices-plan`, `add-prices`); l'app le importa senza mai sovrascrivere un prezzo inserito a mano per lo stesso giorno.
+- Correzione: uno strumento appena creato senza prezzo non mostra più valore zero dopo un acquisto con data passata.
+
 ## Novità della versione 0.6 (Intelligence: verifica delle previsioni e schede aziende)
 
 - **Verifica alla scadenza (X3).** Ogni mattina il motore cerca le previsioni scadute (`tools/intel.mjs due`) e ne registra l'esito (`add-outcomes`). Regole: ultima chiusura disponibile alla scadenza (data del prezzo di partenza + giorni dell'orizzonte), rendimento totale con i dividendi staccati nel periodo, classe rialzo/neutrale/ribasso secondo la fascia dell'orizzonte. Il calcolo lo fa lo strumento, non l'IA. Senza un prezzo affidabile entro 7 giorni l'esito è "non verificabile".

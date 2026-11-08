@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { vault } from './persistence/vault';
 import { useData, runMaintenance } from './state/store';
+import { usePriceSync } from './intel/prices';
 import { NavCtx, type Nav, type Route, type SheetState, type Tab } from './ui/nav';
 import { ToastProvider } from './ui/common';
 import { Icon } from './ui/Icon';
@@ -53,6 +54,7 @@ const TABS: { id: Tab; label: string; icon: string; cls: string }[] = [
 
 function Shell({ onLock }: { onLock: () => void }) {
   const data = useData();
+  usePriceSync();
   const [tab, setTabState] = useState<Tab>('home');
   const [stack, setStack] = useState<Route[]>([]);
   const [sheet, setSheet] = useState<SheetState | null>(null);

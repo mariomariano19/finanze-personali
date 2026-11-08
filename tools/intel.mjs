@@ -11,6 +11,8 @@
 //   INTEL_KEY=... node tools/intel.mjs due [dir]                           → previsioni scadute ancora da verificare
 //   INTEL_KEY=... node tools/intel.mjs add-outcomes <esiti.json> [dir]     → registra gli esiti (calcolo fatto qui, non dall'IA)
 //   INTEL_KEY=... node tools/intel.mjs chain-outcomes [dir]                → una tantum: lega con impronte gli esiti già presenti
+//   INTEL_KEY=... node tools/intel.mjs prices-plan [dir]                   → strumenti di cui aggiornare il prezzo (lista dall'app, senza quantità)
+//   INTEL_KEY=... node tools/intel.mjs add-prices <prezzi.json> [dir]      → registra le chiusure (convertite in euro)
 //   INTEL_KEY=... node tools/intel.mjs dossier-plan [n] [dir]              → quali schede aziendali rifare stasera
 //   INTEL_KEY=... node tools/intel.mjs dossier-get <id> [dir]              → scheda in chiaro su stdout ({} se manca)
 //   INTEL_KEY=... node tools/intel.mjs dossier-put <scheda.json> [dir]     → pubblica una scheda e aggiorna l'indice
@@ -210,6 +212,65 @@ function addOutcomes(list, dir) {
   return res;
 }
 
+// ---------- prezzi degli strumenti posseduti ----------
+export const BENCHMARK = { id: 'benchmark', name: 'S&P 500', proxy: 'iShares Core S&P 500 UCITS ETF (Acc), Xetra, in euro', symbol: 'SXR8.DE', isin: 'IE00B5BMR087' };
+
+function pricesPlan(dir) {
+  const tracked = readEnc(path.join(dir, 'tracked.enc.json'), { items: [] }).items;
+  const book = readEnc(path.join(dir, 'prices.enc.json'), { items: {}, benchmark: { points: [] } });
+  const last = (arr) => (arr && arr.length ? arr[arr.length - 1] : null);
+  return {
+    today: romeToday(),
+    items: [...tracked, { ...BENCHMARK, assetClass: 'etf' }].map((t) => {
+      const l = t.id === 'benchmark' ? last(book.benchmark?.points) : last(book.items?.[t.id]);
+      return { ...t, lastDate: l?.date ?? null, lastPrice: l?.price ?? null, maxAgeDays: t.assetClass === 'pension' ? 60 : 10 };
+    })
+  };
+}
+
+function addPrices(list, dir) {
+  const tracked = readEnc(path.join(dir, 'tracked.enc.json'), { items: [] }).items;
+  const byId = new Map(tracked.map((t) => [t.id, t]));
+  const file = path.join(dir, 'prices.enc.json');
+  const book = readEnc(file, { items: {}, benchmark: { ...BENCHMARK, points: [] } });
+  book.items ??= {};
+  book.benchmark ??= { ...BENCHMARK, points: [] };
+  const today = romeToday();
+  const res = [];
+  for (const r of list) {
+    const t = r.id === 'benchmark' ? { ...BENCHMARK, assetClass: 'etf' } : byId.get(r.id);
+    if (!t) throw new Error(`Strumento ${r.id} non presente nella lista dell'app`);
+    const d = dateOf(r.date);
+    const maxAge = t.assetClass === 'pension' ? 60 : 10;
+    if (!d || d > today || daysBetween(d, today) > maxAge) throw new Error(`${t.name}: data ${r.date} non valida (al massimo ${maxAge} giorni fa)`);
+    if (typeof r.price !== 'number' || !(r.price > 0)) throw new Error(`${t.name}: prezzo non valido`);
+    if (!r.source || !isHttps(r.url)) throw new Error(`${t.name}: servono fonte e url https`);
+    let cur = String(r.currency || '').toUpperCase();
+    let native = r.price;
+    if (cur === 'GBX' || cur === 'GBP' && r.pence) {
+      native = r.price / 100;
+      cur = 'GBP';
+    }
+    let eur = native;
+    let fx;
+    if (cur !== 'EUR') {
+      if (!r.fx || typeof r.fx.rate !== 'number' || !(r.fx.rate > 0) || !isHttps(r.fx.url)) throw new Error(`${t.name}: prezzo in ${cur || '?'}: serve il cambio BCE {rate (${cur} per 1 EUR), source, url}`);
+      eur = native / r.fx.rate;
+      fx = { rate: r.fx.rate, source: r.fx.source || 'BCE', url: r.fx.url };
+    }
+    const point = { date: d, price: Math.round(eur * 1e6) / 1e6, source: r.source, url: r.url, ...(r.unit ? { unit: r.unit } : {}), ...(cur !== 'EUR' ? { native: { price: native, currency: cur }, fx } : {}), ...(r.note ? { note: String(r.note) } : {}) };
+    const arr = r.id === 'benchmark' ? book.benchmark.points : (book.items[r.id] ??= []);
+    const i = arr.findIndex((x) => x.date === d);
+    if (i >= 0) arr[i] = point;
+    else arr.push(point);
+    arr.sort((a, b) => a.date.localeCompare(b.date));
+    res.push({ id: r.id, name: t.name, date: d, eur: point.price });
+  }
+  book.updatedAt = new Date().toISOString();
+  writeEnc(file, book);
+  return res;
+}
+
 // ---------- schede aziendali ----------
 function readWatch(dir) {
   return readEnc(path.join(dir, 'watchlist.enc.json'), { items: [] }).items;
@@ -323,13 +384,15 @@ if (isMain) {
     else if (cmd === 'due') console.log(JSON.stringify(due(a || DEFAULT_DIR), null, 2));
     else if (cmd === 'add-outcomes') console.log(JSON.stringify(addOutcomes(JSON.parse(fs.readFileSync(a, 'utf8')), b || DEFAULT_DIR), null, 2));
     else if (cmd === 'chain-outcomes') console.log(JSON.stringify(chainOutcomes(a || DEFAULT_DIR)));
+    else if (cmd === 'prices-plan') console.log(JSON.stringify(pricesPlan(a || DEFAULT_DIR), null, 2));
+    else if (cmd === 'add-prices') console.log(JSON.stringify(addPrices(JSON.parse(fs.readFileSync(a, 'utf8')), b || DEFAULT_DIR), null, 2));
     else if (cmd === 'dossier-plan') console.log(JSON.stringify(dossierPlan(Number(a) || 7, b || DEFAULT_DIR), null, 2));
     else if (cmd === 'dossier-get') {
       const f = path.join(b || DEFAULT_DIR, 'dossiers', `${a}.enc.json`);
       console.log(JSON.stringify(readEnc(f, {}), null, 2));
     } else if (cmd === 'dossier-put') console.log(JSON.stringify(dossierPut(JSON.parse(fs.readFileSync(a, 'utf8')), b || DEFAULT_DIR)));
     else {
-      console.error('Comandi: newkey | decrypt | encrypt | add-predictions | publish-briefing | verify | due | add-outcomes | chain-outcomes | dossier-plan | dossier-get | dossier-put');
+      console.error('Comandi: newkey | decrypt | encrypt | add-predictions | publish-briefing | verify | due | add-outcomes | prices-plan | add-prices | chain-outcomes | dossier-plan | dossier-get | dossier-put');
       process.exit(2);
     }
   } catch (e) {
