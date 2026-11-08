@@ -1,5 +1,6 @@
 // Import dei pagamenti Apple Pay registrati dall'automazione "Transazione" di Comandi.
-// Ogni pagamento è una riga di un file di testo in iCloud Drive:
+// Ogni pagamento è una riga di un file di testo in iCloud Drive, in uno di questi formati:
+//   <data>;<importo>;<esercente>;<carta>        (consigliato: la data come la scrive l'iPhone)
 //   FP1|<data ISO 8601>|<importo>|<esercente>|<carta>
 // L'import è idempotente: l'id del movimento deriva dal contenuto della riga.
 import type { Settings, Transaction } from '../core/types';
@@ -47,9 +48,20 @@ export function parseAmount(s: string): number | null {
   return neg ? -cents : cents;
 }
 
-/** Data ISO (anche con ora e fuso) o "gg/mm/aaaa" → YYYY-MM-DD */
+const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/** Data ISO, "gg/mm/aaaa", "8 nov 2026 alle 11:15", "8 novembre 2026", "Nov 8, 2026" → YYYY-MM-DD */
 export function parseDate(s: string): string | null {
   const t = s.trim();
+  const named = t.toLowerCase().match(/(\d{1,2})\s+([a-zà-ù]{3,})\.?\s+(\d{4})/);
+  if (named) {
+    const k = named[2].slice(0, 3);
+    const m = MESI.indexOf(k) >= 0 ? MESI.indexOf(k) : MONTHS.indexOf(k);
+    if (m >= 0) return `${named[3]}-${String(m + 1).padStart(2, '0')}-${named[1].padStart(2, '0')}`;
+  }
+  const en = t.toLowerCase().match(/([a-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/);
+  if (en && MONTHS.indexOf(en[1]) >= 0) return `${en[3]}-${String(MONTHS.indexOf(en[1]) + 1).padStart(2, '0')}-${en[2].padStart(2, '0')}`;
   const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
   const it = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/);
@@ -67,13 +79,14 @@ export function parseApplePay(text: string): { entries: ApEntry[]; skipped: stri
   for (const line of text.split(/\r?\n/)) {
     const raw = line.trim();
     if (!raw) continue;
-    const parts = raw.split('|').map((x) => x.trim());
-    if (parts[0] !== 'FP1' || parts.length < 4) {
+    let parts = raw.split(raw.includes('|') ? '|' : ';').map((x) => x.trim());
+    if (parts[0] === 'FP1') parts = parts.slice(1);
+    if (parts.length < 3) {
       skipped.push(raw);
       continue;
     }
-    const date = parseDate(parts[1]);
-    const amt = parseAmount(parts[2]);
+    const date = parseDate(parts[0]);
+    const amt = parseAmount(parts[1]);
     if (!date || amt === null || amt === 0) {
       skipped.push(raw);
       continue;
@@ -81,7 +94,7 @@ export function parseApplePay(text: string): { entries: ApEntry[]; skipped: stri
     const id = 'ap-' + lineHash(raw);
     if (seen.has(id)) continue;
     seen.add(id);
-    entries.push({ id, raw, date, amount: Math.abs(amt), refund: amt < 0, merchant: parts[3] || 'Pagamento Apple Pay', card: parts[4] ?? '' });
+    entries.push({ id, raw, date, amount: Math.abs(amt), refund: amt < 0, merchant: parts[2] || 'Pagamento Apple Pay', card: parts[3] ?? '' });
   }
   return { entries, skipped };
 }

@@ -17,6 +17,9 @@ describe('import Apple Pay', () => {
     expect(parseAmount('abc')).toBeNull();
     expect(parseDate('2026-11-08T10:57:00+01:00')).toBe('2026-11-08');
     expect(parseDate('8/11/2026, 10:57')).toBe('2026-11-08');
+    expect(parseDate('8 nov 2026 alle 11:15')).toBe('2026-11-08');
+    expect(parseDate('8 novembre 2026 alle ore 11:15')).toBe('2026-11-08');
+    expect(parseDate('Nov 8, 2026 at 11:15 AM')).toBe('2026-11-08');
   });
 
   it('righe valide, righe sporche, doppie identiche', () => {
@@ -26,6 +29,12 @@ describe('import Apple Pay', () => {
     expect(r.skipped).toEqual(['riga sbagliata']);
     expect(r.entries[1]).toMatchObject({ amount: 500, refund: true, merchant: 'Zara' });
     expect(r.entries[0].id).toMatch(/^ap-[0-9a-f]{16}$/);
+  });
+
+  it('formato semplice col punto e virgola, senza prefisso e senza carta', () => {
+    const r = parseApplePay('8 nov 2026 alle 11:15;12,50 €;Esselunga;Carta Intesa\n9 nov 2026 alle 08:01;1,20 €;Bar Roma');
+    expect(r.skipped).toEqual([]);
+    expect(r.entries.map((e) => [e.date, e.amount, e.merchant, e.card])).toEqual([['2026-11-08', 1250, 'Esselunga', 'Carta Intesa'], ['2026-11-09', 120, 'Bar Roma', '']]);
   });
 
   it('categorie imparate e regole a mano', () => {

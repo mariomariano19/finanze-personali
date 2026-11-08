@@ -8,7 +8,7 @@ import { planImport, type ImportPlan } from '../ledger/applepay';
 import { newId, nowISO } from '../core/id';
 import { formatEUR } from '../core/money';
 
-export const LINE_TEMPLATE = 'FP1|[Data attuale]|[Importo]|[Esercente]|[Carta]';
+export const LINE_TEMPLATE = '[Data attuale];[Importo];[Esercente];[Carta]';
 
 /** Importa il file scritto dall'automazione di Comandi; restituisce il riepilogo */
 export async function importApplePayFile(file: File): Promise<ImportPlan> {
@@ -77,7 +77,7 @@ export function ApplePay() {
       <div className="card" style={{ gap: 10 }}>
         <span className="card-title">Importa i pagamenti</span>
         <span className="small muted">
-          Scegli il file <b>movimenti.txt</b> in iCloud Drive (cartella Comandi › Finanze). I pagamenti già importati vengono saltati, quindi puoi importare lo stesso file tutte le volte che vuoi.
+          Scegli il file <b>movimenti.txt</b> in iCloud Drive › Shortcuts (in italiano può comparire come “Comandi”). I pagamenti già importati vengono saltati, quindi puoi importare lo stesso file tutte le volte che vuoi.
         </span>
         <input ref={file} type="file" accept=".txt,text/plain" style={{ display: 'none' }} onChange={(e) => onFile(e.target.files?.[0])} />
         <button className="btn" onClick={() => file.current?.click()}>Scegli il file e importa</button>
@@ -136,10 +136,12 @@ export function ApplePay() {
       <div className="card small" style={{ gap: 8 }}>
         <span className="card-title">Come impostare l’automazione (una volta sola)</span>
         <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <li>Apri <b>Comandi</b> › <b>Automazione</b> › <b>+</b> › <b>Transazione</b>. Scegli le carte di Wallet da seguire, lascia “Quando tocco” e seleziona <b>Esegui immediatamente</b>. Avanti › <b>Nuova azione vuota</b>.</li>
-          <li>Aggiungi l’azione <b>Testo</b> e scrivi esattamente: <code style={{ wordBreak: 'break-all' }}>{LINE_TEMPLATE}</code>. Al posto delle parentesi inserisci le variabili: <b>Data attuale</b> (toccala e imposta il formato <b>ISO 8601</b>), poi <b>Importo</b>, <b>Esercente</b> e <b>Carta</b> (o “Nome”) dall’input della transazione. Le barre verticali “|” separano i campi.</li>
-          <li>Aggiungi l’azione <b>Aggiungi al file di testo</b> (Append to Text File): file <b>Finanze/movimenti.txt</b>, attiva <b>Crea se non esiste</b> e <b>Crea nuova riga</b>.</li>
-          <li>Fai un pagamento di prova con Apple Pay, poi torna qui e importa il file: se il pagamento compare tra i “da confermare”, è tutto a posto.</li>
+          <li>Apri <b>Comandi</b>. Con la freccia indietro torna alla <b>Libreria</b> e tocca <b>Automazioni</b>, poi il <b>+</b> in basso.</li>
+          <li>Tocca il pulsante blu <b>Automazioni</b> sotto la ricerca e scegli <b>Wallet</b> (“Quando avvicino una carta…”; nelle versioni precedenti di iOS si chiama <b>Transazione</b>). Lascia “Qualsiasi carta” e <b>Automazione</b> attivo.</li>
+          <li>Cerca e aggiungi <b>Formatta data</b>: data <b>Data attuale</b>, formato <b>ISO 8601</b>.</li>
+          <li>Cerca e aggiungi <b>Testo</b> e scrivi <code style={{ wordBreak: 'break-all' }}>{LINE_TEMPLATE}</code>: dopo FP1| tocca <b>Seleziona variabile</b> e poi il blocco Formatta data; per gli altri campi tocca Seleziona variabile, poi il blocco “Quando…”, tocca il bollino <b>Transazione</b> e scegli <b>Importo</b>, poi <b>Esercente</b>, poi <b>Carta o biglietto</b>. Le barre “|” separano i campi.</li>
+          <li>Cerca e aggiungi <b>Aggiungi a file di testo</b>: percorso <b>movimenti.txt</b>, <b>Crea nuova riga</b> attivo.</li>
+          <li>Paga qualcosa con Apple Pay, poi importa qui il file: il pagamento deve comparire tra i “da confermare”.</li>
         </ol>
         <span className="tiny muted">L’automazione vede solo i pagamenti fatti con Apple Pay (iPhone o Watch). Bonifici, addebiti diretti e carta fisica vanno aggiunti a mano; per affitto e spese fisse usa “Ripeti in automatico” sul movimento.</span>
       </div>
