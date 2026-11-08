@@ -62,6 +62,11 @@ export function saveTransaction(t: Omit<Transaction, 'id' | 'createdAt' | 'updat
 
 export function deleteTransaction(id: string) {
   vault.remove('tx', id);
+  // un pagamento Apple Pay eliminato non deve tornare al prossimo import dello stesso file
+  if (id.startsWith('ap-')) {
+    const cur = vault.get('settings', 'settings');
+    if (cur && !cur.apIgnored?.includes(id)) saveSettings({ apIgnored: [...(cur.apIgnored ?? []), id] });
+  }
 }
 
 export function saveSettings(patch: Partial<Settings>) {

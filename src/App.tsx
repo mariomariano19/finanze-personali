@@ -12,6 +12,7 @@ import { Income } from './screens/Income';
 import { Costs } from './screens/Costs';
 import { Investments, HoldingDetail, Brokers } from './screens/Investments';
 import { Dossier } from './screens/Dossier';
+import { ApplePay } from './screens/ApplePay';
 import { Reports } from './screens/Reports';
 import { Intelligence } from './screens/Intelligence';
 import { IntelSetup } from './screens/IntelSetup';
@@ -121,6 +122,7 @@ function Shell({ onLock }: { onLock: () => void }) {
       case 'security': content = <Security onLock={onLock} />; break;
       case 'categories': content = <Categories kind={route.kind} />; break;
       case 'recurring': content = <Recurring />; break;
+      case 'applePay': content = <ApplePay />; break;
       case 'accounts': content = <Accounts />; break;
       case 'holding': content = <HoldingDetail id={route.id} />; break;
       case 'brokers': content = <Brokers />; break;

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useData } from '../state/store';
 import { useNav } from '../ui/nav';
 import { Header, IconButton, PeriodPicker, Ring, Empty } from '../ui/common';
@@ -10,11 +10,17 @@ import { formatEUR, formatPct, change } from '../core/money';
 import { daysBetween, lastMonths, monthShort, periodLabel, shiftPeriod, today } from '../core/dates';
 import { TxGroupedList } from '../ui/TxRow';
 import { useReturns } from './InvestReturns';
+import { importApplePayFile, summary } from './ApplePay';
+import { useToast } from '../ui/common';
 
 export function Home() {
   const data = useData();
   const nav = useNav();
   const ret = useReturns(data.holdings, data.ops, data.prices, '1G');
+  const toast = useToast();
+  const apFile = useRef<HTMLInputElement>(null);
+  const lastAp = data.settings.lastApplePayImport;
+  const apDays = lastAp ? daysBetween(lastAp.slice(0, 10), today()) : null;
   const hasPortfolio = ret.r.endValue > 0;
   const p = nav.period;
   const prevP = shiftPeriod(p, -1);
@@ -123,6 +129,34 @@ export function Home() {
           </span>
           <Icon name="chevron" size={16} color="var(--muted)" />
         </button>
+      )}
+
+      {lastAp && apDays !== null && apDays >= 2 && (
+        <>
+          <input
+            ref={apFile}
+            type="file"
+            accept=".txt,text/plain"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try {
+                toast(summary(await importApplePayFile(f)));
+              } catch {
+                toast('File non leggibile');
+              }
+              e.target.value = '';
+            }}
+          />
+          <button className="review" onClick={() => apFile.current?.click()}>
+            <span className="badge" style={{ background: 'var(--ink)' }}>
+              <Icon name="card" size={16} color="#fff" />
+            </span>
+            <span style={{ flex: 1 }}>Importa i pagamenti Apple Pay <span className="tiny muted">· ultimo import {apDays} giorni fa</span></span>
+            <Icon name="chevron" size={16} color="var(--muted)" />
+          </button>
+        </>
       )}
 
       {toReview > 0 && (

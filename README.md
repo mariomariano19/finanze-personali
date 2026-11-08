@@ -17,6 +17,13 @@ Web app (PWA) per iPhone per gestire ricavi, costi e investimenti. I dati restan
 - Filtri temporali per settimana, mese, trimestre, anno o periodo personalizzato.
 - Backup cifrato (file JSON) da salvare in iCloud Drive, ripristino ed export dei movimenti in CSV.
 
+## Novità della versione 0.8 (import Apple Pay e spese fisse)
+
+- **Import Apple Pay** (Impostazioni › Apple Pay): l'automazione "Transazione" di Comandi aggiunge ogni pagamento a `iCloud Drive/Comandi/Finanze/movimenti.txt` (riga `FP1|data ISO|importo|esercente|carta`); nell'app si sceglie il file e i pagamenti nuovi finiscono tra i "da confermare". Import idempotente (id dalla riga), i pagamenti eliminati non tornano, accesso rapido da Home se l'ultimo import ha più di due giorni.
+- **Categorie automatiche**: l'app impara esercente → categoria e carta → conto quando confermi; regole a mano "contiene … → categoria"; conferma in blocco dei movimenti con categoria già proposta; opzione (spenta di default) per confermare da soli gli esercenti noti.
+- **Doppioni**: un pagamento importato con stesso importo e data entro 3 giorni di un movimento già presente viene segnalato, con il pulsante "È un doppione: elimina questo".
+- **Ripeti in automatico**: su un movimento già registrato (affitto, abbonamenti…) un pulsante lo trasforma in spesa fissa con la frequenza scelta; dai movimenti ricorrenti si arriva a "Modifica o interrompi".
+
 ## Novità della versione 0.7 (rendimenti del portafoglio)
 
 - **Rendimento** per periodo (1 giorno, 1 settimana, 1 mese, da inizio anno, 1 anno, dall'inizio): guadagno in euro al netto di versamenti e prelievi, TWR (rendimento della gestione), XIRR (rendimento dei tuoi soldi; non annualizzato sotto l'anno), confronto con l'S&P 500 (ETF SXR8 in euro), valore al netto delle tasse stimate (26%, 12,5% titoli di Stato; minusvalenze non compensate).

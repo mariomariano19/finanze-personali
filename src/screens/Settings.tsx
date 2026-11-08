@@ -38,6 +38,7 @@ export function Settings() {
         <Row icon="grid" title="Categorie di spesa" onClick={() => nav.push({ name: 'categories', kind: 'expense' })} />
         <Row icon="income" title="Categorie di ricavo" onClick={() => nav.push({ name: 'categories', kind: 'income' })} />
         <Row icon="repeat" title="Ricorrenze" sub={`${data.rules.filter((r) => r.active).length} attive`} onClick={() => nav.push({ name: 'recurring' })} />
+        <Row icon="card" title="Apple Pay" sub={data.settings.lastApplePayImport ? `Ultimo import: ${dayLabel(data.settings.lastApplePayImport.slice(0, 10))}` : 'Importa i pagamenti registrati da Comandi'} onClick={() => nav.push({ name: 'applePay' })} />
         <Row icon="radar" title="Intelligence" sub={data.settings.intel?.key ? 'Collegata' : 'Non collegata'} onClick={() => nav.push({ name: 'intelSetup' })} />
         <Row icon="card" title="Conti e carte" sub={`${data.accs.filter((a) => !a.hidden).length} conti`} onClick={() => nav.push({ name: 'accounts' })} />
       </div>

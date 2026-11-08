@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useData } from '../state/store';
+import { saveSettings, saveTransaction, useData } from '../state/store';
+import { vault } from '../persistence/vault';
+import { learn } from '../ledger/applepay';
+import { useToast } from '../ui/common';
 import { useNav, type TxFilter } from '../ui/nav';
 import { Header, Empty } from '../ui/common';
 import { TxGroupedList } from '../ui/TxRow';
@@ -30,16 +33,39 @@ export function TxList({ filter }: { filter: TxFilter }) {
     });
   }, [data.txs, data.catMap, filter, q]);
 
+  const toast = useToast();
+  const confirmable = filter.review ? list.filter((t) => t.categoryId && !t.dupOf) : [];
+  function confirmAll() {
+    let settings = vault.get('settings', 'settings')!;
+    for (const t of confirmable) {
+      saveTransaction({ ...t, needsReview: false });
+      const patch = learn(settings, t);
+      if (patch) {
+        saveSettings(patch);
+        settings = { ...settings, ...patch };
+      }
+    }
+    toast(confirmable.length === 1 ? '1 movimento confermato' : `${confirmable.length} movimenti confermati`);
+  }
+
   const total = list.reduce((s, t) => s + (t.type === 'income' ? t.amount : t.type === 'expense' ? -t.amount : 0), 0);
 
   return (
     <div className="screen no-tab">
-      <Header onBack={nav.pop} eyebrow={filter.period ? periodLabel(filter.period) : `${list.length} movimenti`} title={filter.title ?? 'Movimenti'} />
+      <Header onBack={nav.pop} eyebrow={filter.period ? periodLabel(filter.period) : list.length === 1 ? '1 movimento' : `${list.length} movimenti`} title={filter.title ?? 'Movimenti'} />
       <input className="search" type="search" placeholder="Cerca per descrizione, esercente, categoria o importo" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca movimenti" />
       {list.length > 0 && (
         <span className="small muted">
-          {list.length} movimenti · saldo <b className="num">{formatEUR(total, { sign: true })}</b>
+          {list.length === 1 ? '1 movimento' : `${list.length} movimenti`} · saldo <b className="num">{formatEUR(total, { sign: true })}</b>
         </span>
+      )}
+      {confirmable.length > 0 && (
+        <button className="btn secondary" onClick={confirmAll}>
+          {confirmable.length === 1 ? 'Conferma quello con categoria già proposta' : `Conferma i ${confirmable.length} con categoria già proposta`}
+        </button>
+      )}
+      {filter.review && list.length > confirmable.length && (
+        <span className="tiny muted">Quelli senza categoria o segnalati come possibili doppioni vanno aperti uno per uno.</span>
       )}
       {list.length === 0 ? (
         <div className="card"><Empty>Nessun movimento trovato.</Empty></div>

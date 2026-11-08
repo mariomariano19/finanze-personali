@@ -32,6 +32,10 @@ export interface Transaction {
   nature?: Nature; // sovrascrive quella della categoria
   need?: Need;
   needsReview?: boolean;
+  /** carta o pass usato (import Apple Pay) */
+  card?: string;
+  /** possibile doppione di un altro movimento (import) */
+  dupOf?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -149,6 +153,18 @@ export interface Settings {
   createdAt: string;
   /** Collegamento all'Intelligence: chiave di cifratura, token GitHub e deposito (salvati cifrati con il PIN) */
   intel?: { key?: string; token?: string; repo?: string; branch?: string; trackedHash?: string };
+  /** categorie imparate dalle conferme: esercente normalizzato → categoria */
+  merchantRules?: Record<string, string>;
+  /** regole scritte a mano: se l'esercente contiene il testo → categoria */
+  keywordRules?: { id: string; contains: string; categoryId: string }[];
+  /** carta Apple Pay → conto */
+  cardRules?: Record<string, string>;
+  /** conferma automatica dei movimenti Apple Pay di esercenti già noti */
+  autoConfirmKnown?: boolean;
+  /** pagamenti Apple Pay eliminati: non vanno reimportati */
+  apIgnored?: string[];
+  /** data dell'ultimo import Apple Pay */
+  lastApplePayImport?: string;
 }
 
 /** Copia locale dei dati Intelligence, per consultarli anche senza rete */

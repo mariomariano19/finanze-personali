@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Sheet, Segmented, useToast } from '../ui/common';
 import { Icon } from '../ui/Icon';
-import { useData, saveTransaction, deleteTransaction } from '../state/store';
+import { saveSettings, useData, saveTransaction, deleteTransaction } from '../state/store';
 import { vault } from '../persistence/vault';
 import { formatEUR } from '../core/money';
-import { today } from '../core/dates';
+import { addDays, today } from '../core/dates';
 import { newId } from '../core/id';
 import { NATURE_LABEL, NEED_LABEL, ASSET_CLASS_LABEL, NON_LISTED, defaultTaxClass, type AssetClass, type Frequency, type Nature, type Need, type Transaction, type TxType } from '../core/types';
-import { FREQUENCY_LABEL } from '../ledger/recurring';
+import { FREQUENCY_LABEL, nextOccurrence } from '../ledger/recurring';
+import { learn } from '../ledger/applepay';
 import { useNav } from '../ui/nav';
 
 type Mode = TxType | 'investment';
@@ -168,8 +169,14 @@ export function TxSheet({ id, initialType, initialCategory }: { id?: string; ini
       recurringId,
       nature: nature || undefined,
       need: need || undefined,
+      card: existing?.card,
       needsReview: false
     });
+    // conferma di un movimento importato: l'app impara esercente → categoria e carta → conto
+    if (existing?.needsReview && mode !== 'transfer') {
+      const patch = learn(data.settings, { type: mode, merchant: merchant.trim() || existing.merchant, categoryId, card: existing.card, accountId });
+      if (patch) saveSettings(patch);
+    }
     toast(existing ? 'Movimento aggiornato' : mode === 'income' ? 'Ricavo salvato' : mode === 'expense' ? 'Spesa salvata' : 'Giroconto salvato');
     nav.closeSheet();
   }
@@ -187,6 +194,38 @@ export function TxSheet({ id, initialType, initialCategory }: { id?: string; ini
     }
     vault.put('op', { id: newId(), holdingId: hid, brokerId: invBroker || null, kind: opKind, date, quantity: qty, amount: cents, fees: toCents(fees.replace('.', ',')), taxes: 0, source: 'manual' });
     toast(opKind === 'buy' ? 'Acquisto registrato' : 'Vendita registrata');
+    nav.closeSheet();
+  }
+
+  /** Trasforma un movimento già registrato in una spesa (o entrata) fissa che si ripete da sola */
+  function makeRecurring() {
+    if (!existing || existing.recurringId || mode === 'transfer' || mode === 'investment' || !cents) return;
+    const f: Frequency = freq === 'none' ? 'monthly' : freq;
+    const id = newId();
+    const rule = {
+      id,
+      type: mode,
+      amount: cents,
+      categoryId,
+      description: description.trim() || merchant.trim() || cat?.name || '',
+      accountId,
+      frequency: f,
+      startDate: date,
+      lastGenerated: date,
+      active: true
+    };
+    vault.put('rec', rule);
+    saveTransaction({ ...existing, type: mode, amount: cents, date, categoryId, description: description.trim(), merchant: merchant.trim() || undefined, accountId, recurringId: id, needsReview: false });
+    const next = nextOccurrence(rule, addDays(date, 1));
+    toast(next && next !== date ? `Ricorrenza attiva: il prossimo il ${new Date(next + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}` : 'Ricorrenza attiva');
+    nav.closeSheet();
+  }
+
+  function deleteDuplicate() {
+    if (!existing) return;
+    if (!window.confirm('Eliminare questo movimento importato perché è un doppione?')) return;
+    deleteTransaction(existing.id);
+    toast('Doppione eliminato');
     nav.closeSheet();
   }
 
@@ -237,9 +276,21 @@ export function TxSheet({ id, initialType, initialCategory }: { id?: string; ini
 
       {existing?.needsReview && (
         <div className="notice warn">
-          <Icon name="info" size={18} /> Movimento importato: controlla categoria e importo, poi salva per confermarlo.
+          <Icon name="info" size={18} /> Movimento importato{existing.card ? ` (${existing.card})` : ''}: controlla categoria e importo, poi salva per confermarlo.
         </div>
       )}
+      {existing?.needsReview && existing.dupOf && (() => {
+        const d = data.txs.find((t) => t.id === existing.dupOf);
+        if (!d) return null;
+        return (
+          <div className="notice warn small" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+            <span>
+              <b>Possibile doppione</b> di “{d.description || d.merchant || data.catMap.get(d.categoryId ?? '')?.name || 'movimento'}” del {new Date(d.date + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} ({formatEUR(d.amount)}), già registrato.
+            </span>
+            <button type="button" className="btn small secondary" style={{ alignSelf: 'flex-start' }} onClick={deleteDuplicate}>È un doppione: elimina questo</button>
+          </div>
+        );
+      })()}
 
       {isTx && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -384,7 +435,7 @@ export function TxSheet({ id, initialType, initialCategory }: { id?: string; ini
         )}
         {isTx && !existing && (
           <div className="field">
-            <label htmlFor="f-freq">Ricorrenza</label>
+            <label htmlFor="f-freq">Ripeti in automatico</label>
             <select id="f-freq" value={freq} onChange={(e) => setFreq(e.target.value as 'none' | Frequency)}>
               <option value="none">Nessuna</option>
               {Object.entries(FREQUENCY_LABEL).map(([k, v]) => (
@@ -398,7 +449,34 @@ export function TxSheet({ id, initialType, initialCategory }: { id?: string; ini
         {isTx && existing?.recurringId && (
           <div className="field">
             <span className="lbl">Ricorrenza</span>
-            <span className="small muted">Generato da una regola ricorrente</span>
+            <span className="small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span className="muted">Si ripete in automatico</span>
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  nav.closeSheet();
+                  setTimeout(() => nav.openSheet({ name: 'rule', id: existing.recurringId }), 0);
+                }}
+              >
+                Modifica o interrompi
+              </button>
+            </span>
+          </div>
+        )}
+        {isTx && existing && !existing.recurringId && (
+          <div className="field">
+            <span className="lbl">Spesa fissa?</span>
+            <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select aria-label="Frequenza" value={freq === 'none' ? 'monthly' : freq} onChange={(e) => setFreq(e.target.value as Frequency)} style={{ width: 'auto' }}>
+                {Object.entries(FREQUENCY_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              <button type="button" className="btn small secondary" onClick={makeRecurring} disabled={!cents}>
+                Ripeti in automatico
+              </button>
+            </span>
           </div>
         )}
       </div>

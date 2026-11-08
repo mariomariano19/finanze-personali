@@ -21,6 +21,7 @@ export type Route =
   | { name: 'settings' }
   | { name: 'categories'; kind: 'income' | 'expense' }
   | { name: 'recurring' }
+  | { name: 'applePay' }
   | { name: 'accounts' }
   | { name: 'backup' }
   | { name: 'security' }
