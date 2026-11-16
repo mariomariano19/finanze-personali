@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { advice, budgets } from '../analytics/savings';
 import { useData } from '../state/store';
 import { useNav } from '../ui/nav';
 import { Header, IconButton, Empty, useToast } from '../ui/common';
@@ -92,6 +93,25 @@ export function Reports() {
               {(() => { const c = change(r.expense, r.expenseAvg3); return c === null ? '' : ` (questo mese ${formatPct(c, { sign: true })})`; })()}
             </span>
           )}
+
+          {(() => {
+            const tips = advice({ txs: data.txs, cats: data.cats, catMap: data.catMap, rules: data.rules, today: today(), goalPct: data.settings.savingsGoal }).filter((a) => !data.settings.adviceState?.[a.id]);
+            const over = budgets(data.txs, data.catMap, today(), data.settings.budgets).filter((l) => l.active && l.ratio > 1);
+            if (!tips.length && !over.length) return null;
+            return (
+              <div className="card" style={{ gap: 8 }}>
+                <span className="card-title">Piano di risparmio</span>
+                {over.length > 0 && <span className="small"><b>Budget superati questo mese:</b> {over.map((l) => `${l.name} (${formatEUR(l.spent, { short: true })} su ${formatEUR(l.limit, { short: true })})`).join(', ')}.</span>}
+                {tips.slice(0, 3).map((a) => (
+                  <span key={a.id} className="small" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span>{a.title}</span>
+                    <b className="num good" style={{ whiteSpace: 'nowrap' }}>≈ {formatEUR(a.yearly, { short: true })}/anno</b>
+                  </span>
+                ))}
+                <button className="link" style={{ alignSelf: 'flex-start' }} onClick={() => nav.push({ name: 'savings' })}>Apri il piano di risparmio ›</button>
+              </div>
+            );
+          })()}
 
           <div className="card">
             <span className="card-title">Principali categorie di spesa</span>

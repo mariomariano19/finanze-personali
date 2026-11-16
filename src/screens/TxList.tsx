@@ -21,6 +21,7 @@ export function TxList({ filter }: { filter: TxFilter }) {
     return data.txs.filter((t) => {
       if (filter.type && t.type !== filter.type) return false;
       if (filter.review && !t.needsReview) return false;
+      if (filter.ids && !filter.ids.includes(t.id)) return false;
       if (filter.period && !inPeriod(t.date, filter.period)) return false;
       if (filter.categoryId && t.categoryId !== filter.categoryId) return false;
       if (filter.macroId && macroOf(t.categoryId, data.catMap)?.id !== filter.macroId) return false;

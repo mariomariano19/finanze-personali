@@ -17,6 +17,14 @@ Web app (PWA) per iPhone per gestire ricavi, costi e investimenti. I dati restan
 - Filtri temporali per settimana, mese, trimestre, anno o periodo personalizzato.
 - Backup cifrato (file JSON) da salvare in iCloud Drive, ripristino ed export dei movimenti in CSV.
 
+## Novità della versione 0.9 (piano di risparmio)
+
+- **Schermata Risparmio** (tocca l'anello "risparmio" in Home): risparmio del mese e degli ultimi 3 mesi completi rispetto all'obiettivo (modificabile lì), quanto manca al mese per raggiungerlo. Risparmio = ricavi − costi; gli investimenti non sono costi.
+- **Budget per categoria**: proposti dalla media degli ultimi 3 mesi (arrotondata ai 5 € superiori), da attivare uno a uno o tutti insieme, modificabili; barra verde/gialla/rossa con il segno di quanto mese è trascorso. Le spese fisse e ricorrenti non hanno budget.
+- **Consigli calcolati sul telefono** (nessun dato esce dal dispositivo), ognuno con il valore stimato in euro l'anno e i movimenti da cui nasce: piccole spese ripetute, abbonamenti (regole ricorrenti e abbonamenti riconosciuti da esercente e importo), categorie in crescita, spese discrezionali quando il risparmio è sotto l'obiettivo, costi bancari. "Fatto" / "Non mi interessa" / ripristina.
+- **Simulazione**: scegli i consigli e vedi risparmio mensile, annuo e nuovo tasso di risparmio rispetto all'obiettivo.
+- **Report mensile**: riquadro "Piano di risparmio" con budget superati e principali consigli.
+
 ## Novità della versione 0.8 (import Apple Pay e spese fisse)
 
 - **Import Apple Pay** (Impostazioni › Apple Pay): l'automazione "Transazione" di Comandi aggiunge ogni pagamento a `iCloud Drive/Comandi/Finanze/movimenti.txt` (riga `FP1|data ISO|importo|esercente|carta`); nell'app si sceglie il file e i pagamenti nuovi finiscono tra i "da confermare". Import idempotente (id dalla riga), i pagamenti eliminati non tornano, accesso rapido da Home se l'ultimo import ha più di due giorni.

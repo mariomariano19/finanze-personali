@@ -12,6 +12,8 @@ export interface TxFilter {
   need?: Need;
   junk?: boolean;
   review?: boolean;
+  /** solo questi movimenti (es. quelli da cui nasce un consiglio) */
+  ids?: string[];
   period?: Period;
   title?: string;
 }
@@ -22,6 +24,7 @@ export type Route =
   | { name: 'categories'; kind: 'income' | 'expense' }
   | { name: 'recurring' }
   | { name: 'applePay' }
+  | { name: 'savings' }
   | { name: 'accounts' }
   | { name: 'backup' }
   | { name: 'security' }

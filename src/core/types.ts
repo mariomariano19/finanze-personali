@@ -163,6 +163,10 @@ export interface Settings {
   autoConfirmKnown?: boolean;
   /** pagamenti Apple Pay eliminati: non vanno reimportati */
   apIgnored?: string[];
+  /** budget mensili per categoria (centesimi), attivati dall'utente */
+  budgets?: Record<string, number>;
+  /** consigli di risparmio segnati come fatti o non interessanti */
+  adviceState?: Record<string, { state: 'done' | 'dismissed'; at: string }>;
   /** data dell'ultimo import Apple Pay */
   lastApplePayImport?: string;
 }

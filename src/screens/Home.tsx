@@ -94,7 +94,10 @@ export function Home() {
             </span>
           )}
         </div>
-        <Ring ratio={cur.savingsRate} label="risparmio" />
+        <button onClick={() => nav.push({ name: 'savings' })} aria-label="Apri il piano di risparmio" style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, color: 'inherit' }}>
+          <Ring ratio={cur.savingsRate} label="risparmio" />
+          <span className="tiny" style={{ opacity: 0.8 }}>Piano ›</span>
+        </button>
       </div>
 
       <div className="kpis">
